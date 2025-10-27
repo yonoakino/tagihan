@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AKINO.NET - Tagihan Bulanan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        /* Mengatur font agar terlihat seperti gambar */
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Inter:wght@400;700&display=swap');
+
+        /* Custom style untuk judul besar agar terlihat menonjol */
+        .header-title {
+            font-family: 'Oswald', sans-serif;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            -webkit-text-stroke: 1px #880000; /* Outline merah */
+            color: white; /* Warna utama putih, diganti di Tailwind */
+        }
+
+        /* Style untuk kotak informasi agar mengikuti desain di gambar */
+        .info-box {
+            border: 2px solid black;
+            box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.3);
+            font-family: 'Inter', sans-serif;
+        }
+        /* Mencegah highlight pada elemen yang dapat diklik pada perangkat sentuh */
+        .no-tap-highlight {
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Styling untuk tombol menu aktif (mirip office ribbon) */
+        .menu-btn {
+            /* Membagi lebar tombol secara merata, kini ada 6 tombol */
+            min-width: calc(100% / 6); 
+        }
+        .menu-btn:not(:last-child) {
+            border-right: 1px solid #ddd;
+        }
+    </style>
+</head>
+<!-- Body disetel agar tingginya 100% layar (h-screen) dan menghilangkan overflow (scroll) global -->
+<body class="bg-gray-100 h-screen overflow-hidden flex flex-col items-center justify-start py-4">
+
+    <div id="login-screen" class="absolute inset-0 bg-gray-100 flex items-center justify-center p-4 z-50 hidden">
+        <div class="w-full max-w-xs rounded-lg border-4 border-black p-6 shadow-2xl bg-white info-box">
+            <h2 class="header-title text-4xl text-center text-red-700 uppercase mb-4" style="color: #3b82f6; text-shadow: 2px 2px 0px #000080;">AKINO.NET</h2>
+            <p class="text-sm text-gray-700 text-center mb-6 font-semibold">Silakan Login</p>
+            
+            <form onsubmit="event.preventDefault(); handleLogin();" class="space-y-4">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700">Nama Pengguna</label>
+                    <input type="text" id="username" value="AKINO"
+                            class="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500 shadow-sm" required>
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Kata Sandi</label>
+                    <input type="password" id="password"
+                            class="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500 shadow-sm" required>
+                </div>
+                <button type="submit" 
+                        class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition duration-200 shadow-md info-box">
+                    MASUK
+                </button>
+            </form>
+        </div>
+    </div>
+    <!-- Kontainer utama kini menggunakan h-full dan flex flex-col untuk mengisi sisa ruang vertikal -->
+    <div id="main-app-content" class="w-full max-w-sm rounded-lg border-4 border-black p-4 shadow-2xl hidden h-full flex flex-col"
+            style="background-color: #3b82f6; /* Warna biru cerah */">
+        
+        <!-- Header (flex-shrink-0) -->
+        <header class="text-center mb-2 flex-shrink-0"> <!-- mb-4 dikurangi menjadi mb-2 -->
+            <h1 class="header-title text-5xl md:text-6xl text-red-700 uppercase" style="color: white; text-shadow: 3px 3px 0px #880000;">AKINO.NET</h1>
+            <p class="text-xl font-bold text-white mt-2 tracking-widest">TAGIHAN BULANAN</p>
+        </header>
+
+        <!-- Menu Ribbon (flex-shrink-0) -->
+        <div class="mb-2 rounded-lg overflow-hidden border-2 border-black shadow-md flex-shrink-0"> <!-- mb-4 dikurangi menjadi mb-2 -->
+            <div class="flex flex-wrap text-center text-xs font-semibold bg-white">
+                <button id="menu-tambah-btn" onclick="toggleMenuSection('tambah')" class="menu-btn flex-1 p-2 text-gray-800 hover:bg-gray-100 transition duration-150">
+                    Tambah
+                </button>
+                <button id="menu-edit-btn" onclick="toggleMenuSection('edit')" class="menu-btn flex-1 p-2 text-gray-800 hover:bg-gray-100 transition duration-150">
+                    Edit
+                </button>
+                <button id="menu-hapus-btn" onclick="toggleMenuSection('hapus')" class="menu-btn flex-1 p-2 text-gray-800 hover:bg-gray-100 transition duration-150">
+                    Hapus
+                </button>
+                <button id="menu-laporan-btn" onclick="toggleMenuSection('laporan')" class="menu-btn flex-1 p-2 text-gray-800 hover:bg-gray-100 transition duration-150">
+                    Laporan
+                </button>
+                <button id="menu-pembuat-btn" onclick="showCreatorInfo()" class="menu-btn flex-1 p-2 text-gray-800 hover:bg-gray-100 transition duration-150">
+                    About
+                </button>
+                   <button id="menu-logout-btn" onclick="handleLogout()" class="menu-btn flex-1 p-2 text-gray-800 hover:bg-red-100 transition duration-150">
+                    Logout
+                </button>
+            </div>
+        </div>
+
+        <!-- Kolom Pencarian (flex-shrink-0) -->
+        <div class="mb-2 flex-shrink-0"> <!-- mb-4 dikurangi menjadi mb-2 -->
+            <label for="client-id" class="block text-sm font-semibold text-white mb-2">Cari Tagihan (Masukkan ID Pelanggan atau Nama)</label>
+            <div class="flex">
+                <input type="text" id="client-id" placeholder="Contoh: 123 atau Budi"
+                        class="w-full p-2 rounded-l-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                <button onclick="fetchClientData()"
+                        class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-r-lg transition duration-200">
+                    Cari
+                </button>
+            </div>
+        </div>
+        
+        <!-- Dropdown Bulan (flex-shrink-0) -->
+        <div class="mb-2 flex-shrink-0"> <!-- mb-6 dikurangi menjadi mb-2 -->
+            <label for="billing-month" class="block text-sm font-semibold text-white mb-2">Pilih Periode Tagihan</label>
+            <select id="billing-month" onchange="changeBillingMonth()"
+                    class="w-full p-2 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500 font-bold text-gray-800">
+                </select>
+            <!-- Menghilangkan paragraf reset-info sesuai permintaan -->
+        </div>
+
+        <!-- Area Dinamis & Scrollable (flex-grow) -->
+        <div id="dynamic-area" class="flex-grow overflow-y-auto pb-4">
+            
+            <div id="result-container" class="space-y-2"> <!-- space-y-4 dikurangi menjadi space-y-2 -->
+                <div id="initial-message" class="info-box bg-white p-4 rounded-lg text-center text-gray-500 font-semibold">
+                    </div>
+                
+                <div id="data-display" class="space-y-2 hidden"> <!-- space-y-4 dikurangi menjadi space-y-2 -->
+                    
+                    <!-- Mengurangi p-4 menjadi p-2 (padding vertikal lebih kecil) -->
+                    <div class="info-box bg-white p-2 rounded-md text-center">
+                        <p id="client-name" class="text-xl md:text-2xl font-bold text-gray-800">Nama Pelanggan</p>
+                    </div>
+
+                    <!-- Mengurangi p-4 menjadi p-2 (padding vertikal lebih kecil) -->
+                    <div class="info-box bg-white p-2 rounded-md text-center">
+                        <p id="client-bill" class="text-2xl md:text-3xl font-extrabold text-green-600">Rp. 0,-</p>
+                    </div>
+
+                    <!-- Mengurangi p-4 menjadi p-2 (padding vertikal lebih kecil) -->
+                    <div id="status-box" class="info-box p-2 rounded-md text-center bg-red-600">
+                        <p id="client-status" class="text-2xl md:text-3xl font-extrabold text-white">STATUS</p>
+                    </div>
+
+                    <button id="toggle-button" onclick="" 
+                            class="w-full p-3 font-bold rounded-lg text-white no-tap-highlight transition duration-200 shadow-md">
+                        Loading...
+                    </button>
+
+                    <button onclick="generatePDFInvoice()"
+                            class="w-full p-3 mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition duration-200 shadow-md">
+                        Buat Invoice
+                    </button>
+                     <button onclick="sendWhatsappInvoice()"
+                            class="w-full p-3 mt-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition duration-200 shadow-md">
+                        Kirim Invoice via WhatsApp
+                    </button>
+                </div>
+            </div>
+
+            <div id="tambah-panel" class="menu-content hidden mt-2 space-y-2 p-3 bg-blue-700 rounded-lg info-box"> <!-- Jarak dikurangi -->
+                <h2 class="text-white text-lg font-bold border-b border-white pb-2">Tambah Pelanggan Baru</h2>
+                <div class="bg-white p-4 rounded-lg shadow-inner border-2 border-gray-300">
+                    <input type="text" id="new-id" placeholder="ID Baru (Contoh: 300)" class="w-full p-2 mb-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                    <input type="text" id="new-name" placeholder="Nama Pelanggan" class="w-full p-2 mb-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                    <input type="text" id="new-wa" placeholder="Nomor WA (Contoh: 6281xxxxxx)" class="w-full p-2 mb-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                    <input type="number" id="new-bill" placeholder="Tagihan Dasar (Rp.)" class="w-full p-2 mb-3 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                    
+                    <div class="flex space-x-3"> 
+                        <button onclick="clearNewClientForm()" class="w-1/3 p-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition duration-200 shadow-md">
+                            Batal
+                        </button>
+                        <button onclick="addNewClient()" class="w-2/3 p-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition duration-200 shadow-md">
+                            Tambah Klien
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="edit-panel" class="menu-content hidden mt-2 space-y-2 p-3 bg-blue-700 rounded-lg info-box"> <!-- Jarak dikurangi -->
+                <h2 class="text-white text-lg font-bold border-b border-white pb-2">Edit Data Pelanggan</h2>
+                <div class="bg-white p-4 rounded-lg shadow-inner border-2 border-gray-300">
+                    <input type="text" id="edit-id" placeholder="ID Pelanggan yang akan diedit" class="w-full p-2 mb-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <button onclick="loadClientForEdit()" class="w-full p-2 mb-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition duration-200 shadow-md">
+                        Muat Data
+                    </button>
+                    <input type="text" id="edit-name" placeholder="Nama Pelanggan Baru" class="w-full p-2 mb-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-500" required disabled>
+                    <input type="text" id="edit-wa" placeholder="Nomor WA Baru" class="w-full p-2 mb-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required disabled>
+                    <input type="number" id="edit-bill" placeholder="Tagihan Dasar Baru (Rp.)" class="w-full p-2 mb-3 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-500" required disabled>
+                    <button id="save-edit-btn" onclick="saveEditedClient()" class="w-full p-2 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold rounded-lg transition duration-200 shadow-md" disabled>
+                        Simpan Perubahan
+                    </button>
+                </div>
+            </div>
+
+            <div id="hapus-panel" class="menu-content hidden mt-2 space-y-2 p-3 bg-blue-700 rounded-lg info-box"> <!-- Jarak dikurangi -->
+                <h2 class="text-white text-lg font-bold border-b border-white pb-2">Hapus Data Pelanggan</h2>
+                <div class="bg-white p-4 rounded-lg shadow-inner border-2 border-gray-300">
+                    <input type="text" id="delete-id" placeholder="ID Pelanggan yang akan dihapus" class="w-full p-2 mb-3 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                    <button onclick="deleteClientData()" class="w-full p-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition duration-200 shadow-md">
+                        Hapus Permanen
+                    </button>
+                </div>
+            </div>
+
+            <div id="laporan-panel" class="menu-content hidden mt-2 space-y-2 p-3 bg-blue-700 rounded-lg info-box"> <!-- Jarak dikurangi -->
+                <h2 class="text-white text-lg font-bold border-b border-white pb-2">Laporan & Export Data</h2>
+                <div class="bg-white p-4 rounded-lg shadow-inner border-2 border-gray-300 space-y-2"> <!-- space-y-3 dikurangi menjadi space-y-2 -->
+                    
+                    <!-- Filter Status Tagihan dipindahkan ke Modal -->
+
+                    <button onclick="exportFileWithData()"
+                            class="w-full p-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition duration-200 shadow-md">
+                        Backup Data
+                    </button>
+                    
+                    <button onclick="exportToCSV()"
+                            class="w-full p-3 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg transition duration-200 shadow-md">
+                        Kirim Laporan
+                    </button>
+                    
+                    <!-- Tombol Rekapitulasi - Panggil fungsi yang benar -->
+                    <button onclick="generateRecapReport()"
+                            class="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition duration-200 shadow-md">
+                        Rekapitulasi
+                    </button>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer (flex-shrink-0) -->
+        <div class="text-center w-full text-xs text-white pt-4 mt-2 border-t border-white border-opacity-30 flex-shrink-0">
+            Hak Cipta &copy; Yono 2025
+        </div>
+
+    </div>
+    
+    <div id="custom-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl p-6 shadow-2xl w-full max-w-md sm:max-w-lg md:max-w-xl info-box">
+            <h3 id="modal-title" class="text-xl font-bold text-gray-800 mb-4">Informasi</h3>
+            <p id="modal-message" class="text-gray-700 mb-6"></p>
+            <div id="modal-actions" class="flex justify-end space-x-3">
+                <button id="modal-cancel-button" 
+                        class="px-4 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400">
+                    Tutup
+                </button>
+                <button id="modal-confirm-button" 
+                        class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Variabel Global
+        let currentClientId = null;
+        let clientDatabase = {};
+        
+        // ==============================================
+        //     		 EMBEDDED CREDENTIALS & CONFIG (Sebagai Fallback)
+        // ==============================================
+        const EMBEDDED_LOGIN_USERNAME = 'AKINO'; 
+        const EMBEDDED_LOGIN_PASSWORD = '12345678';
+        const EMBEDDED_WHATSAPP_NUMBER = '6281373888882';
+
+        // Variabel sesi untuk menyimpan kredensial dan konfigurasi
+        let VALID_CREDENTIALS = {};
+        let APP_CONFIG = {};
+        
+        // ==============================================
+        //     		 CREATOR INFO & APP SETTINGS
+        // ==============================================
+        window.showCreatorInfo = () => {
+             // Pastikan modal ditutup jika ada panel menu yang terbuka
+             document.querySelectorAll('.menu-content').forEach(div => div.classList.add('hidden')); 
+             document.querySelectorAll('.menu-btn').forEach(btn => { 
+                if (!btn.id.includes('pembuat') && !btn.id.includes('logout')) { 
+                    btn.classList.remove('bg-blue-600', 'text-white'); 
+                    btn.classList.add('bg-white', 'text-gray-800'); 
+                } 
+             });
+             document.getElementById('menu-pembuat-btn').classList.remove('bg-blue-600', 'text-white'); 
+             document.getElementById('menu-pembuat-btn').classList.add('bg-white', 'text-gray-800');
+
+
+            const message = `
+                <div class="text-center space-y-3">
+                    <p class="text-2xl font-extrabold text-blue-700">WIYONO</p>
+                    <p class="text-lg font-semibold text-gray-800">WA: 081373888882</p>
+                </div>
+                
+                <h4 class="text-lg font-bold text-gray-800 mt-6 mb-4">Pengaturan Aplikasi</h4>
+                <div class="space-y-3 p-3 border rounded-lg bg-gray-50">
+                    <div>
+                        <label for="app-whatsapp" class="block text-sm font-medium text-gray-700">No. WhatsApp Laporan (Format: 62...)</label>
+                        <input type="text" id="app-whatsapp" value="${APP_CONFIG.whatsappNumber}"
+                               class="mt-1 w-full p-2 border rounded text-sm" required>
+                    </div>
+                    <hr class="my-4">
+                    <h5 class="text-md font-bold text-gray-800">Ganti Data Pengguna</h5>
+                    <div>
+                        <label for="new-username" class="block text-sm font-medium text-gray-700">Nama Pengguna Baru</label>
+                        <input type="text" id="new-username" value="${VALID_CREDENTIALS.username}"
+                               class="mt-1 w-full p-2 border rounded text-sm" required>
+                    </div>
+                    <div>
+                        <label for="new-password" class="block text-sm font-medium text-gray-700">Kata Sandi Baru</label>
+                        <input type="password" id="new-password"
+                               class="mt-1 w-full p-2 border rounded text-sm" required>
+                    </div>
+                    <button onclick="saveAppSettings()"
+                            class="w-full p-3 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg transition duration-200 shadow-md">
+                        Simpan Pengaturan
+                    </button>
+                    <p class="text-xs text-gray-600 mt-2 italic">Perubahan disimpan otomatis. 'Backup Data' di menu Laporan digunakan untuk membuat salinan file.</p>
+                </div>
+            `;
+            showModal("Informasi & Pengaturan", message, false); 
+        };
+        
+        // ==============================================
+        //     		 SAVE APP SETTINGS
+        // ==============================================
+        window.saveAppSettings = () => {
+            const newUsername = document.getElementById('new-username').value.trim();
+            const newPassword = document.getElementById('new-password').value.trim();
+            const newWhatsappNumber = document.getElementById('app-whatsapp').value.trim();
+
+            if (!newUsername || !newPassword || !newWhatsappNumber) { 
+                showModal("Kesalahan", "Mohon isi semua kolom pengaturan dengan benar.", false);
+                return;
+            }
+            if (!/^[62]\d+$/.test(newWhatsappNumber)) {
+                showModal("Kesalahan", "Format Nomor WhatsApp tidak valid. Harap gunakan format 62... dan hanya berisi angka.", false);
+                return;
+            }
+
+            VALID_CREDENTIALS.username = newUsername;
+            VALID_CREDENTIALS.password = newPassword;
+            APP_CONFIG.whatsappNumber = newWhatsappNumber;
+            
+            saveDataToBrowser(); // Simpan otomatis ke browser
+            document.getElementById('custom-modal').classList.add('hidden');
+            showModal("Pengaturan Disimpan", "Pengaturan baru telah disimpan secara otomatis.", false);
+        };
+
+        // ==============================================
+        //     		 LOGIN & INITIALIZATION
+        // ==============================================
+        
+        window.handleLogin = () => {
+            const usernameInput = document.getElementById('username').value.trim();
+            const passwordInput = document.getElementById('password').value.trim();
+            
+            if (usernameInput === VALID_CREDENTIALS.username && passwordInput === VALID_CREDENTIALS.password) {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('main-app-content').classList.remove('hidden');
+                loadApplicationContent();
+            } else {
+                showModal("Akses Ditolak", "Nama Pengguna atau Kata Sandi salah. Mohon coba lagi.");
+            }
+        };
+
+        const initializeApp = () => {
+            const savedCredentials = localStorage.getItem('akinoNetCredentials');
+            const savedAppConfig = localStorage.getItem('akinoNetAppConfig');
+
+            if (savedCredentials) {
+                VALID_CREDENTIALS = JSON.parse(savedCredentials);
+            } else {
+                VALID_CREDENTIALS.username = EMBEDDED_LOGIN_USERNAME;
+                VALID_CREDENTIALS.password = EMBEDDED_LOGIN_PASSWORD;
+            }
+
+            if (savedAppConfig) {
+                APP_CONFIG = JSON.parse(savedAppConfig);
+            } else {
+                APP_CONFIG.whatsappNumber = EMBEDDED_WHATSAPP_NUMBER;
+            }
+            
+            document.getElementById('login-screen').classList.remove('hidden');
+        };
+
+        // ==============================================
+        //     		 EMBEDDED DATA (Fallback)
+        // ==============================================
+        // MEMPERBAIKI STRUKTUR DATA FALLBACK UNTUK MENAMBAH WA
+        const EMBEDDED_CLIENT_DATA_JSON = `{
+            "123": { "name": "Bpk. Budi Santoso", "bill": 70000, "wa": "6281234567890", "months": [] },
+            "456": { "name": "Ibu Rina Dewi", "bill": 95000, "wa": "6287654321098", "months": [] }
+        }`;
+        const EMBEDDED_LAST_BILLING_MONTH_VALUE = '2025-01'; 
+        
+        let lastResetMonth = '2000-01';
+        
+        const BILLING_MONTHS = [ { value: '2025-01', name: 'Januari 2025' }, { value: '2025-02', name: 'Februari 2025' }, { value: '2025-03', name: 'Maret 2025' }, { value: '2025-04', name: 'April 2025' }, { value: '2025-05', name: 'Mei 2025' }, { value: '2025-06', name: 'Juni 2025' }, { value: '2025-07', name: 'Juli 2025' }, { value: '2025-08', name: 'Agustus 2025' }, { value: '2025-09', name: 'September 2025' }, { value: '2025-10', name: 'Oktober 2025' }, { value: '2025-11', name: 'November 2025' }, { value: '2025-12', name: 'Desember 2025' } ];
+        const BILLING_MONTHS_MAP = BILLING_MONTHS.reduce((acc, month) => { acc[month.value] = month.name; return acc; }, {});
+        
+        // ==============================================
+        //     		 DATA PERSISTENCE (LOCAL STORAGE)
+        // ==============================================
+        
+        function saveDataToBrowser() {
+            try {
+                localStorage.setItem('akinoNetClientData', JSON.stringify(clientDatabase));
+                localStorage.setItem('akinoNetLastReset', lastResetMonth);
+                localStorage.setItem('akinoNetCredentials', JSON.stringify(VALID_CREDENTIALS));
+                localStorage.setItem('akinoNetAppConfig', JSON.stringify(APP_CONFIG));
+                console.log("Data saved to browser successfully.");
+            } catch (e) {
+                console.error("Error saving data to localStorage:", e);
+                showModal("Gagal Menyimpan Otomatis", "Gagal menyimpan data ke browser. Mungkin penyimpanan penuh.", false);
+            }
+        }
+        
+        const loadApplicationContent = () => {
+            const savedClientData = localStorage.getItem('akinoNetClientData');
+            const savedLastReset = localStorage.getItem('akinoNetLastReset');
+
+            if (savedClientData && savedLastReset) {
+                console.log("Loading client data from browser storage.");
+                clientDatabase = JSON.parse(savedClientData);
+                lastResetMonth = savedLastReset;
+            } else {
+                console.log("No client data in browser, loading from embedded fallback.");
+                clientDatabase = JSON.parse(EMBEDDED_CLIENT_DATA_JSON);
+                lastResetMonth = EMBEDDED_LAST_BILLING_MONTH_VALUE;
+                saveDataToBrowser(); // Lakukan simpan awal jika data belum ada
+            }
+
+            // Pastikan semua entri data lama memiliki field 'wa'
+            for (const id in clientDatabase) {
+                if (!clientDatabase[id].hasOwnProperty('wa')) {
+                    clientDatabase[id].wa = ''; // Tambahkan default jika tidak ada
+                }
+            }
+            saveDataToBrowser(); // Simpan jika ada penyesuaian data lama
+
+            const today = new Date(), currentYearMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+            let availableBillingMonths = BILLING_MONTHS.filter(m => m.value <= currentYearMonth).slice(-4);
+            let defaultMonth = availableBillingMonths[availableBillingMonths.length - 1] || BILLING_MONTHS[0];
+            const monthDropdown = document.getElementById('billing-month');
+            monthDropdown.innerHTML = ''; 
+            availableBillingMonths.forEach(month => {
+                const option = document.createElement('option');
+                option.value = month.value; option.textContent = month.name;
+                if (month.value === defaultMonth.value) option.selected = true;
+                monthDropdown.appendChild(option);
+            });
+            if (getCurrentSelectedMonth() > lastResetMonth) {
+                resetAllStatusesToUnpaid();
+                // document.getElementById('reset-info').classList.remove('hidden'); // Dihilangkan sesuai permintaan
+            } else {
+                // document.getElementById('reset-info').classList.add('hidden'); // Dihilangkan sesuai permintaan
+            }
+            updateSummaryDisplay();
+        };
+        
+        // ==============================================
+        //     		 HELPER & REPORTING FUNCTIONS
+        // ==============================================
+
+        const getCurrentSelectedMonth = () => document.getElementById('billing-month').value;
+        
+        const getCurrentSelectedMonthName = () => BILLING_MONTHS_MAP[getCurrentSelectedMonth()];
+
+        const getOrCreateMonthEntry = (clientId, monthName) => {
+            const client = clientDatabase[clientId];
+            if (!client || !client.months) return null;
+            let monthEntry = client.months.find(m => m.month === monthName);
+            if (!monthEntry) {
+                monthEntry = { month: monthName, bill: client.bill, status: 'BELUM LUNAS' };
+                client.months.push(monthEntry);
+            }
+            return monthEntry;
+        };
+
+        const getCurrentClientStatus = (clientId) => {
+            const monthName = getCurrentSelectedMonthName();
+            const monthEntry = clientDatabase[clientId].months.find(m => m.month === monthName);
+            return monthEntry ? monthEntry.status : 'BELUM LUNAS';
+        };
+
+        const calculateMonthlySummary = () => {
+            const currentMonthName = getCurrentSelectedMonthName();
+            let totalPaidClients = 0;
+            let totalPaidAmount = 0;
+            for (const id in clientDatabase) {
+                const client = clientDatabase[id];
+                const monthEntry = client.months.find(m => m.month === currentMonthName);
+                const status = monthEntry ? monthEntry.status : 'BELUM LUNAS';
+                if (status === 'LUNAS') {
+                    totalPaidClients++;
+                    const bill = monthEntry ? monthEntry.bill : client.bill; 
+                    totalPaidAmount += bill;
+                }
+            }
+            return { totalPaidClients, totalPaidAmount, currentMonthName };
+        };
+
+        const updateSummaryDisplay = () => {
+            const summary = calculateMonthlySummary();
+            const initialMessage = document.getElementById('initial-message');
+            const formattedAmount = `Rp. ${summary.totalPaidAmount.toLocaleString('id-ID')},-`;
+            initialMessage.classList.add('space-y-3', 'text-gray-800');
+            initialMessage.innerHTML = `<p class="font-bold text-lg border-b pb-2">Rekap ${summary.currentMonthName}</p> <div class="flex justify-between"><span>Pelanggan LUNAS:</span><span class="font-bold text-green-600">${summary.totalPaidClients}</span></div> <div class="flex justify-between"><span>Total Pemasukan:</span><span class="font-bold text-indigo-700">${formattedAmount}</span></div> <p class="text-xs text-gray-500 pt-3 border-t mt-3">Cari ID atau Nama untuk detail.</p>`;
+        };
+        
+        /**
+         * Fungsi BARU yang menghasilkan dan menampilkan laporan berdasarkan status filter yang diberikan.
+         */
+        const displayRecapReport = (filterStatus) => {
+            const currentMonthName = getCurrentSelectedMonthName();
+            
+            // Hitung Grand Totals (untuk footer) dari SEMUA klien di bulan ini
+            let grandTotalBilledAmount = 0, grandTotalPaidAmount = 0;
+            for (const id in clientDatabase) {
+                const client = clientDatabase[id];
+                const monthEntry = client.months.find(m => m.month === currentMonthName);
+                const billedAmount = client.bill;
+                const status = monthEntry ? monthEntry.status : 'BELUM LUNAS';
+                
+                grandTotalBilledAmount += billedAmount;
+                if (status === 'LUNAS') grandTotalPaidAmount += billedAmount;
+            }
+            
+            // Buat Tabel dengan Filter
+            let tableRowsHtml = `<table class="min-w-full text-xs"><thead><tr class="bg-gray-100"><th class="px-2 py-1 text-left">ID</th><th class="px-2 py-1 text-left">Nama</th><th class="px-2 py-1 text-right">Tagihan</th><th class="px-2 py-1 text-center">Status</th></tr></thead><tbody>`;
+            let rowCount = 0;
+
+            for (const id in clientDatabase) {
+                const client = clientDatabase[id];
+                const monthEntry = client.months.find(m => m.month === currentMonthName);
+                const billedAmount = client.bill;
+                const status = monthEntry ? monthEntry.status : 'BELUM LUNAS';
+                
+                // Cek kondisi filter
+                if (filterStatus === 'ALL' || filterStatus === status) {
+                    rowCount++;
+                    const statusColor = status === 'LUNAS' ? 'text-green-600' : 'text-red-600';
+                    tableRowsHtml += `<tr><td class="px-2 py-1">${id}</td><td class="px-2 py-1">${client.name}</td><td class="px-2 py-1 text-right">${billedAmount.toLocaleString('id-ID')}</td><td class="px-2 py-1 text-center ${statusColor}">${status}</td></tr>`;
+                }
+            }
+
+            if (rowCount === 0 && filterStatus !== 'ALL') {
+                 tableRowsHtml += `<tr><td colspan="4" class="px-2 py-4 text-center text-gray-500">Tidak ada pelanggan yang cocok dengan filter **${filterStatus}** untuk bulan ini.</td></tr>`;
+            } else if (rowCount === 0 && filterStatus === 'ALL') {
+                 tableRowsHtml += `<tr><td colspan="4" class="px-2 py-4 text-center text-gray-500">Tidak ada data pelanggan yang ditemukan.</td></tr>`;
+            }
+            
+            // Tambahkan Footer dengan Grand Totals
+            tableRowsHtml += `</tbody><tfoot class="font-bold bg-gray-100 border-t-2">`;
+            tableRowsHtml += `<tr><td colspan="2" class="px-2 py-1 text-right">Total Klien:</td><td colspan="2" class="px-2 py-1 text-center text-indigo-700">${rowCount}</td></tr>`;
+            tableRowsHtml += `<tr><td colspan="2" class="px-2 py-1 text-right">Total Tagihan:</td><td class="px-2 py-1 text-right text-red-700">${grandTotalBilledAmount.toLocaleString('id-ID')}</td><td></td></tr>`;
+            tableRowsHtml += `<tr><td colspan="2" class="px-2 py-1 text-right">Total yang Lunas:</td><td class="px-2 py-1 text-right text-green-700">${grandTotalPaidAmount.toLocaleString('id-ID')}</td><td></td></tr>`;
+            tableRowsHtml += `</tfoot></table>`;
+            
+            showModal(`Rekapitulasi ${currentMonthName} (Filter: ${filterStatus})`, `<div class="max-h-[50vh] overflow-y-auto">${tableRowsHtml}</div>`, false);
+        };
+
+        /**
+         * Fungsi yang dipanggil oleh tombol Rekapitulasi. Menampilkan modal filter.
+         */
+        window.generateRecapReport = () => {
+             // Pastikan panel menu ditutup sebelum menampilkan modal
+             document.querySelectorAll('.menu-content').forEach(div => div.classList.add('hidden')); 
+             document.querySelectorAll('.menu-btn').forEach(btn => { 
+                if (!btn.id.includes('pembuat') && !btn.id.includes('logout')) { 
+                    btn.classList.remove('bg-blue-600', 'text-white'); 
+                    btn.classList.add('bg-white', 'text-gray-800'); 
+                } 
+             });
+            
+             // 1. Definisikan HTML untuk Filter UI di dalam modal
+            const filterHtml = `
+                <div class="space-y-4">
+                    <p class="text-sm text-gray-700">Pilih status tagihan yang ingin Anda tampilkan dalam laporan:</p>
+                    <select id="dynamic-recap-filter-status" class="w-full p-3 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-800">
+                        <option value="ALL">Semua Status</option>
+                        <option value="LUNAS">LUNAS</option>
+                        <option value="BELUM LUNAS">BELUM LUNAS</option>
+                    </select>
+                </div>
+            `;
+
+            // 2. Tampilkan Modal untuk Meminta Filter
+            showModal("Pilih Filter Rekapitulasi", filterHtml, true, () => {
+                // Callback ini dieksekusi saat tombol 'Tampilkan Rekap' ditekan
+                const filterStatus = document.getElementById('dynamic-recap-filter-status').value;
+                
+                // 3. Panggil fungsi untuk menampilkan laporan dengan filter yang dipilih
+                displayRecapReport(filterStatus);
+            }, 'Tampilkan Rekap'); // Tombol konfirmasi diubah menjadi 'Tampilkan Rekap'
+        };
+        
+        // ==============================================
+        //     		 CORE LOGIC & CRUD
+        // ==============================================
+
+        const resetAllStatusesToUnpaid = () => {
+            const currentMonth = getCurrentSelectedMonth(), currentMonthName = getCurrentSelectedMonthName();
+            for (const id in clientDatabase) {
+                const monthEntry = getOrCreateMonthEntry(id, currentMonthName);
+                if (monthEntry) { monthEntry.status = 'BELUM LUNAS'; monthEntry.bill = clientDatabase[id].bill; }
+            }
+            lastResetMonth = currentMonth;
+            if (currentClientId) updateStatusDisplay(currentClientId);
+            updateSummaryDisplay();
+            saveDataToBrowser();
+        };
+
+        const processPayment = () => {
+            if (!currentClientId) return;
+            const monthEntry = getOrCreateMonthEntry(currentClientId, getCurrentSelectedMonthName());
+            if (monthEntry) monthEntry.status = 'LUNAS';
+            saveDataToBrowser();
+            updateStatusDisplay(currentClientId);
+            showModal("Lunas", `Pembayaran **${clientDatabase[currentClientId].name}** berhasil.`);
+            setTimeout(() => {
+                document.getElementById('data-display').classList.add('hidden');
+                document.getElementById('initial-message').classList.remove('hidden');
+                document.getElementById('client-id').value = '';
+                currentClientId = null;
+                updateSummaryDisplay();
+            }, 3000);
+        };
+
+        const processStatusToUnpaid = () => {
+            if (!currentClientId) return;
+            const monthEntry = getOrCreateMonthEntry(currentClientId, getCurrentSelectedMonthName());
+            if (monthEntry) monthEntry.status = 'BELUM LUNAS';
+            saveDataToBrowser();
+            updateStatusDisplay(currentClientId); 
+            updateSummaryDisplay();
+            showModal("Status Diubah", `Status **${clientDatabase[currentClientId].name}** diubah ke BELUM LUNAS.`);
+        };
+
+        // MEMPERBARUI FUNGSI TAMBAH KLIEN
+        window.addNewClient = () => {
+            const newId = document.getElementById('new-id').value.trim(), 
+                  newName = document.getElementById('new-name').value.trim(), 
+                  newWa = document.getElementById('new-wa').value.trim(),
+                  newBill = Number(document.getElementById('new-bill').value); 
+                  
+            if (!newId || !newName || !newWa || isNaN(newBill) || newBill <= 0) { showModal("Kesalahan", "Mohon isi semua kolom dengan benar.", false); return; }
+            if (!/^[62]\d+$/.test(newWa)) {
+                showModal("Kesalahan", "Nomor WA tidak valid. Harap gunakan format 62...", false);
+                return;
+            }
+            if (clientDatabase.hasOwnProperty(newId)) { showModal("Kesalahan", `ID **${newId}** sudah ada.`, false); return; }
+            
+            const message = `Tambah klien baru:<br><b>ID:</b> ${newId}<br><b>Nama:</b> ${newName}<br><b>WA:</b> ${newWa}<br><b>Tagihan:</b> Rp. ${newBill.toLocaleString('id-ID')},-`;
+            showModal("Konfirmasi Tambah", message, true, () => {
+                clientDatabase[newId] = { name: newName, bill: newBill, wa: newWa, months: [] };
+                saveDataToBrowser();
+                clearNewClientForm();
+                showModal("Sukses!", `Klien **${newName}** ditambahkan. Data telah disimpan.`, false);
+                updateSummaryDisplay();
+            });
+        };
+
+        // MEMPERBARUI FUNGSI SIMPAN EDIT KLIEN
+        window.saveEditedClient = () => {
+            const editId = document.getElementById('edit-id').value.trim(), 
+                  newName = document.getElementById('edit-name').value.trim(), 
+                  newWa = document.getElementById('edit-wa').value.trim(),
+                  newBill = Number(document.getElementById('edit-bill').value);
+                  
+            if (!editId || !clientDatabase.hasOwnProperty(editId) || !newName || !newWa || isNaN(newBill) || newBill <= 0) {
+                showModal("Kesalahan", "Data tidak valid atau klien tidak ditemukan.", false); return;
+            }
+            if (!/^[62]\d+$/.test(newWa)) {
+                showModal("Kesalahan", "Nomor WA tidak valid. Harap gunakan format 62...", false);
+                return;
+            }
+
+            const client = clientDatabase[editId], oldName = client.name, oldBill = client.bill, oldWa = client.wa;
+            const message = `Yakin ubah data **${oldName}**?<br>Nama: ${oldName} -> <b>${newName}</b><br>WA: ${oldWa} -> <b>${newWa}</b><br>Tagihan: Rp. ${oldBill.toLocaleString('id-ID')} -> <b>Rp. ${newBill.toLocaleString('id-ID')}</b>`;
+            
+            showModal("Konfirmasi Edit", message, true, () => {
+                client.name = newName; 
+                client.bill = newBill;
+                client.wa = newWa; // Menyimpan nomor WA yang baru
+                client.months.forEach(m => { if (m.status === 'BELUM LUNAS') m.bill = newBill; });
+                saveDataToBrowser();
+                resetEditForm(); 
+                updateSummaryDisplay();
+                showModal("Edit Berhasil", `Data klien **${newName}** telah diperbarui dan disimpan.`, false);
+            });
+        };
+
+        window.deleteClientData = () => {
+              const deleteId = document.getElementById('delete-id').value.trim();
+              if (!deleteId || !clientDatabase.hasOwnProperty(deleteId)) {
+                showModal("Kesalahan", `ID Pelanggan **${deleteId}** tidak ditemukan.`, false);
+                return;
+            }
+              const client = clientDatabase[deleteId];
+            showModal("Konfirmasi Hapus", `Yakin hapus **${client.name}** (ID: ${deleteId}) secara permanen?`, true, () => {
+                delete clientDatabase[deleteId];
+                saveDataToBrowser();
+                updateSummaryDisplay();
+                document.getElementById('delete-id').value = '';
+                showModal("Hapus Berhasil", `Klien **${client.name}** telah dihapus.`, false);
+            });
+        };
+
+        // ==============================================
+        //     		 UI & EVENT HANDLERS
+        // ==============================================
+        
+        const showModal = (title, message, isConfirm = false, onConfirm = () => {}, confirmText = 'Ya') => {
+            const modal = document.getElementById('custom-modal');
+            const titleEl = document.getElementById('modal-title');
+            const messageEl = document.getElementById('modal-message');
+            const confirmBtn = document.getElementById('modal-confirm-button');
+            const cancelBtn = document.getElementById('modal-cancel-button');
+
+            titleEl.innerHTML = title;
+            messageEl.innerHTML = message;
+            
+            confirmBtn.onclick = () => { modal.classList.add('hidden'); if(isConfirm) onConfirm(); };
+            confirmBtn.innerHTML = isConfirm ? confirmText : 'Tutup';
+            confirmBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            confirmBtn.classList.add(isConfirm ? 'bg-red-600' : 'bg-indigo-600', isConfirm ? 'hover:bg-red-700' : 'hover:bg-indigo-700');
+
+
+            if(isConfirm) {
+                cancelBtn.classList.remove('hidden');
+                cancelBtn.onclick = () => modal.classList.add('hidden');
+            } else {
+                cancelBtn.classList.add('hidden');
+            }
+            modal.classList.remove('hidden');
+        };
+
+        window.changeBillingMonth = () => {
+            const newMonthName = getCurrentSelectedMonthName();
+            if (getCurrentSelectedMonth() > lastResetMonth) {
+                showModal("Bulan Baru", `Status semua klien akan direset ke BELUM LUNAS untuk periode **${newMonthName}**. Lanjutkan?`, true, () => {
+                    resetAllStatusesToUnpaid();
+                    // document.getElementById('reset-info').classList.remove('hidden'); // Dihilangkan sesuai permintaan
+                });
+            } else { 
+                // document.getElementById('reset-info').classList.add('hidden'); // Dihilangkan sesuai permintaan
+            }
+            if (currentClientId) updateStatusDisplay(currentClientId); else { updateSummaryDisplay(); }
+        };
+
+        window.showPaymentConfirmation = () => {
+            const monthEntry = getOrCreateMonthEntry(currentClientId, getCurrentSelectedMonthName());
+            showModal("Konfirmasi Bayar", `Konfirmasi pembayaran untuk **${clientDatabase[currentClientId].name}** sejumlah **Rp. ${monthEntry.bill.toLocaleString('id-ID')}**?`, true, processPayment);
+        };
+        
+        window.toggleStatusToUnpaid = () => {
+            showModal("Konfirmasi Ubah Status", `Ubah status **${clientDatabase[currentClientId].name}** kembali ke BELUM LUNAS?`, true, processStatusToUnpaid);
+        };
+        
+        const updateStatusDisplay = (clientId) => {
+            const clientData = clientDatabase[clientId], statusBox = document.getElementById('status-box'), statusElement = document.getElementById('client-status'), toggleButton = document.getElementById('toggle-button');
+            if (!clientData) return;
+            const status = getCurrentClientStatus(clientId);
+            statusElement.textContent = status;
+            statusBox.className = `info-box p-2 rounded-md text-center text-white ${status === 'LUNAS' ? 'bg-green-600' : 'bg-red-600'}`;
+            // MENGUBAH CLASS PADA TOMBOL (toggleButton) UNTUK MENAMBAH text-2xl
+            toggleButton.className = `w-full p-3 font-bold text-2xl rounded-lg text-white no-tap-highlight transition duration-200 shadow-md ${status === 'LUNAS' ? 'bg-red-700 hover:bg-red-800' : 'bg-green-700 hover:bg-green-800'}`;
+            toggleButton.textContent = status === 'LUNAS' ? "Ubah ke BELUM LUNAS" : "BAYAR";
+            toggleButton.setAttribute('onclick', status === 'LUNAS' ? 'toggleStatusToUnpaid()' : 'showPaymentConfirmation()');
+            const monthEntry = clientData.months.find(m => m.month === getCurrentSelectedMonthName());
+            document.getElementById('client-bill').textContent = `Rp. ${(monthEntry ? monthEntry.bill : clientData.bill).toLocaleString('id-ID')},-`;
+        };
+        
+        window.fetchClientData = () => {
+            const query = document.getElementById('client-id').value.trim();
+            document.getElementById('data-display').classList.add('hidden'); document.getElementById('initial-message').classList.remove('hidden'); currentClientId = null; document.querySelectorAll('.menu-content').forEach(div => div.classList.add('hidden'));
+            if (!query) { return; }
+            let clientIdFound = null;
+            if (clientDatabase.hasOwnProperty(query)) clientIdFound = query;
+            else {
+                const searchNameLower = query.toLowerCase();
+                const matched = Object.keys(clientDatabase).filter(id => clientDatabase[id].name.toLowerCase().includes(searchNameLower));
+                if (matched.length === 1) clientIdFound = matched[0];
+                else if (matched.length > 1) { showModal("Pencarian Ganda", `Ditemukan beberapa hasil untuk "${query}". Mohon gunakan ID yang lebih spesifik.`, false); return; }
+            }
+            if (!clientIdFound) { showModal("Tidak Ditemukan", `Pelanggan "${query}" tidak terdaftar.`, false); return; }
+            currentClientId = clientIdFound;
+            document.getElementById('initial-message').classList.add('hidden'); document.getElementById('data-display').classList.remove('hidden');
+            document.getElementById('client-name').textContent = clientDatabase[clientIdFound].name;
+            updateStatusDisplay(currentClientId);
+        };
+        
+        window.exportFileWithData = () => {
+            let currentHTML = document.documentElement.outerHTML;
+            // Menyisipkan data terbaru dari localStorage ke dalam script fallback
+            const dataToEmbed = localStorage.getItem('akinoNetClientData') || JSON.stringify(clientDatabase);
+            const resetToEmbed = localStorage.getItem('akinoNetLastReset') || lastResetMonth;
+            const credsToEmbed = localStorage.getItem('akinoNetCredentials') || JSON.stringify(VALID_CREDENTIALS);
+            const configToEmbed = localStorage.getItem('akinoNetAppConfig') || JSON.stringify(APP_CONFIG);
+
+            const newJsonDeclaration = `const EMBEDDED_CLIENT_DATA_JSON = \`${JSON.stringify(JSON.parse(dataToEmbed), null, 4).replace(/`/g, "\\`")}\``;
+            currentHTML = currentHTML.replace(/(const\s+EMBEDDED_CLIENT_DATA_JSON\s+=\s+`)([\s\S]*?)`/m, newJsonDeclaration);
+            currentHTML = currentHTML.replace(/(const\s+EMBEDDED_LAST_BILLING_MONTH_VALUE\s+=\s+')([^']+)'/s, `const EMBEDDED_LAST_BILLING_MONTH_VALUE = '${resetToEmbed}'`);
+            currentHTML = currentHTML.replace(/(const\s+EMBEDDED_LOGIN_USERNAME\s+=\s+')([^']+)'/s, `const EMBEDDED_LOGIN_USERNAME = '${JSON.parse(credsToEmbed).username}'`);
+            currentHTML = currentHTML.replace(/(const\s+EMBEDDED_LOGIN_PASSWORD\s+=\s+')([^']+)'/s, `const EMBEDDED_LOGIN_PASSWORD = '${JSON.parse(credsToEmbed).password}'`);
+            currentHTML = currentHTML.replace(/(const\s+EMBEDDED_WHATSAPP_NUMBER\s+=\s+')([^']+)'/s, `const EMBEDDED_WHATSAPP_NUMBER = '${JSON.parse(configToEmbed).whatsappNumber}'`);
+            const blob = new Blob([currentHTML], { type: 'text/html;charset=utf-8;' });
+            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `AKINONET_Backup_${new Date().toISOString().slice(0, 10)}.html`; link.click();
+            showModal("Backup Berhasil", "File HTML berisi data terakhir Anda telah diunduh. Simpan sebagai cadangan atau untuk pindah perangkat.");
+        };
+        
+        /**
+         * FUNGSI GENERATE PDF (DEFAULT)
+         */
+        window.generatePDFInvoice = () => { 
+            if (!currentClientId) { showModal("Error", "Pilih pelanggan dulu.", false); return; } 
+            
+            const { jsPDF } = window.jspdf; 
+            // Inisialisasi PDF dengan mode portrait (P) dan satuan milimeter (mm)
+            const doc = new jsPDF({
+                orientation: "p",
+                unit: "mm",
+                format: [100, 150] // Ukuran kustom yang lebih kecil (misal: 100mm x 150mm)
+            }); 
+            
+            const clientData = clientDatabase[currentClientId];
+            const monthName = getCurrentSelectedMonthName();
+            const monthValue = getCurrentSelectedMonth(); 
+            const monthEntry = getOrCreateMonthEntry(currentClientId, monthName); 
+            const billAmount = monthEntry.bill; 
+            const status = monthEntry.status;
+
+            let y = 15; // Posisi Y awal
+            const centerX = doc.internal.pageSize.width / 2;
+            const PADDING = 10;
+            const WIDTH = doc.internal.pageSize.width - (2 * PADDING);
+
+            // Judul AKINO.NET (Replikasi style teks besar merah/putih)
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(30);
+            doc.setTextColor(200, 0, 0); // Merah tua
+            doc.text("AKINO.NET", centerX, y, { align: "center" });
+
+            y += 15; // Jarak setelah Judul
+            
+            // Judul Tagihan
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.setTextColor(0, 0, 0); // Hitam
+            doc.text("TAGIHAN WIFI", centerX, y, { align: "center" });
+
+            y += 18;
+            
+            // Bulan (Label dan Placeholder)
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "normal");
+            doc.text("BULAN :", PADDING + 15, y); 
+            doc.text(monthName, PADDING + 45, y); 
+            doc.line(PADDING + 42, y + 1, WIDTH + PADDING - 15, y + 1); 
+            
+            y += 12;
+
+            // Nama Pelanggan (Label dan Placeholder)
+            doc.setFontSize(14);
+            doc.text("NAMA PELANGGAN", PADDING + 15, y); 
+
+            y += 12;
+
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text(clientData.name, centerX, y, { align: "center" }); 
+            doc.line(PADDING + 15, y + 2, WIDTH + PADDING - 15, y + 2); 
+
+            y += 15;
+
+            // Tagihan Jumlah (Label dan Placeholder)
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "normal");
+            doc.text("Rp. ", PADDING + 15, y); 
+            
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            const formattedBill = billAmount.toLocaleString('id-ID');
+            doc.text(formattedBill, centerX + 10, y, { align: "center" }); 
+            doc.line(PADDING + 25, y + 1, WIDTH + PADDING - 15, y + 1); 
+
+            y += 18;
+
+            // Status LUNAS/BELUM LUNAS (Di dalam kotak lebar)
+            const STATUS_HEIGHT = 10;
+            const STATUS_WIDTH = WIDTH - 10;
+            const STATUS_X = PADDING + 5; // Start X
+            const STATUS_Y = y;
+            
+            // Kotak Status (Biru solid)
+            doc.setFillColor(32, 76, 114); 
+            doc.rect(STATUS_X, STATUS_Y, STATUS_WIDTH, STATUS_HEIGHT, 'F');
+            
+            // Teks Status (Putih, di tengah)
+            doc.setFontSize(18);
+            doc.setTextColor(255, 255, 255); 
+            doc.setFont("helvetica", "bold");
+            doc.text(status, centerX, STATUS_Y + STATUS_HEIGHT / 2 + 1.5, { align: "center" });
+
+
+            doc.save(`Invoice-${currentClientId}-${monthValue}.pdf`); 
+        };
+        
+        /**
+         * FUNGSI KIRIM INVOICE VIA WHATSAPP (PESAN TEKS)
+         * Menampilkan modal untuk input/konfirmasi nomor pelanggan sebelum mengirim.
+         */
+        window.sendWhatsappInvoice = () => {
+            if (!currentClientId) { 
+                showModal("Error", "Pilih pelanggan dulu sebelum mengirim tagihan.", false); 
+                return; 
+            } 
+            
+            const clientData = clientDatabase[currentClientId];
+            const monthName = getCurrentSelectedMonthName();
+            const monthEntry = getOrCreateMonthEntry(currentClientId, monthName); 
+            const billAmount = monthEntry.bill; 
+            const status = monthEntry.status;
+            const formattedBill = `Rp ${billAmount.toLocaleString('id-ID')},-`;
+
+            // Menggunakan nomor WA yang tersimpan (jika ada) sebagai nilai default
+            const savedWa = clientData.wa || ''; 
+            
+            // HTML untuk input nomor WhatsApp di dalam modal
+            const inputHtml = `
+                <div class="space-y-3">
+                    <p class="text-sm text-gray-700">Tagihan untuk: <b>${clientData.name}</b> (Bulan: ${monthName})</p>
+                    <label for="customer-whatsapp" class="block text-sm font-medium text-gray-700">Nomor WhatsApp Pelanggan (Contoh: 6281...)</label>
+                    <input type="text" id="customer-whatsapp" placeholder="Masukkan Nomor WhatsApp (Diawali 62)" value="${savedWa}"
+                           class="mt-1 w-full p-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:focus:ring-green-500" required>
+                    <p class="text-xs text-gray-500 italic">Nomor ini terisi otomatis dari data pelanggan. Pastikan dimulai dengan 62 tanpa spasi.</p>
+                </div>
+            `;
+            
+            // Fungsi yang dieksekusi setelah konfirmasi (menekan tombol Kirim)
+            const executeSendWa = () => {
+                const customerWaNumber = document.getElementById('customer-whatsapp').value.trim();
+                
+                if (!customerWaNumber || !/^[62]\d+$/.test(customerWaNumber)) {
+                    showModal("Kesalahan", "Nomor WhatsApp tidak valid. Harap gunakan format 62... dan hanya berisi angka.", false);
+                    return;
+                }
+                
+                const waMessage = `
+*TAGIHAN AKINO.NET*
+
+*Nama:* ${clientData.name}
+*ID Pelanggan:* ${currentClientId}
+
+*Bulan:* ${monthName}
+*Tagihan:* ${formattedBill}
+
+*Status:* ${status}
+${status === 'BELUM LUNAS' ? 
+`\nMohon segera lakukan pembayaran. Terima kasih!` : 
+`\nTerima kasih, pembayaran Anda sudah kami terima!`}
+`;
+                
+                const encodedMessage = encodeURIComponent(waMessage.trim());
+                const waLink = `https://wa.me/${customerWaNumber}?text=${encodedMessage}`;
+                
+                window.open(waLink, '_blank');
+            };
+
+            showModal("Kirim Tagihan via WhatsApp", inputHtml, true, executeSendWa, 'Kirim WA ke Pelanggan'); 
+        };
+
+        
+        window.exportToCSV = () => { const currentMonthName = getCurrentSelectedMonthName(); let csv = `ID_Pelanggan;Nama;Tagihan;Status_Pembayaran_${currentMonthName.replace(/ /g, '_')}\n`; for (const id in clientDatabase) { const client = clientDatabase[id]; const monthEntry = client.months.find(m => m.month === currentMonthName); csv += `${id};"${client.name}";${(monthEntry ? monthEntry.bill : client.bill)};${(monthEntry ? monthEntry.status : 'BELUM LUNAS')}\n`; } const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `Laporan_Tagihan_${currentMonthName.replace(/ /g, '_')}.csv`; link.click(); const waLink = `https://wa.me/${APP_CONFIG.whatsappNumber}?text=Berikut%20adalah%20laporan%20tagihan.`; showModal("Export CSV Berhasil", `File CSV telah diunduh. <br><br> <a href="${waLink}" target="_blank" class="p-2 bg-green-500 text-white rounded-lg">Kirim via WhatsApp</a>`, false); };
+        
+        window.handleLogout = () => showModal("Logout", "Apakah Anda yakin ingin logout? Perubahan terakhir sudah disimpan.", true, () => { window.location.reload(); });
+
+        // OTHER UTILITIES
+        window.clearNewClientForm = () => { document.getElementById('new-id').value = ''; document.getElementById('new-name').value = ''; document.getElementById('new-wa').value = ''; document.getElementById('new-bill').value = ''; };
+        
+        const resetEditForm = (id, name, wa, bill, enable) => { 
+            document.getElementById('edit-id').value = id || ''; 
+            document.getElementById('edit-name').value = name || ''; 
+            document.getElementById('edit-wa').value = wa || ''; // Tambahkan WA
+            document.getElementById('edit-bill').value = bill || ''; 
+            document.getElementById('edit-name').disabled = !enable; 
+            document.getElementById('edit-wa').disabled = !enable; // Aktifkan/nonaktifkan WA
+            document.getElementById('edit-bill').disabled = !enable; 
+            document.getElementById('save-edit-btn').disabled = !enable; 
+        };
+        
+        window.loadClientForEdit = () => { 
+            const editId = document.getElementById('edit-id').value.trim(); 
+            resetEditForm(editId, '', '', '', false); 
+            if (!editId || !clientDatabase.hasOwnProperty(editId)) { 
+                showModal("Kesalahan", `ID Pelanggan **${editId}** tidak ditemukan.`, false); 
+                return; 
+            } 
+            const client = clientDatabase[editId]; 
+            resetEditForm(editId, client.name, client.wa, client.bill, true); // Perbarui dengan WA
+            showModal("Data Dimuat", `Data klien **${client.name}** berhasil dimuat.`, false); 
+        };
+
+        window.toggleMenuSection = (sectionId) => { 
+            const targetPanel = document.getElementById(sectionId + '-panel'); 
+            const targetButton = document.getElementById(sectionId === 'pembuat' ? 'menu-pembuat-btn' : 'menu-' + sectionId + '-btn');
+            const isTargetActive = !targetPanel.classList.contains('hidden'); 
+            
+            // 1. Sembunyikan semua panel konten dan reset tampilan semua tombol
+            document.querySelectorAll('.menu-content').forEach(div => div.classList.add('hidden')); 
+            document.querySelectorAll('.menu-btn').forEach(btn => { 
+                btn.classList.remove('bg-blue-600', 'text-white'); 
+                btn.classList.add('bg-white', 'text-gray-800'); 
+            });
+
+            // 2. Sembunyikan tampilan data pelanggan (kembali ke summary)
+            document.getElementById('data-display').classList.add('hidden'); 
+            document.getElementById('initial-message').classList.remove('hidden'); 
+            currentClientId = null; 
+            updateSummaryDisplay(); 
+            resetEditForm(); 
+
+            // 3. Jika targetPanel bukan About/Logout dan belum aktif, aktifkan
+            if (!isTargetActive) { 
+                if (sectionId !== 'pembuat' && sectionId !== 'logout') {
+                    targetPanel.classList.remove('hidden'); 
+                    targetButton.classList.add('bg-blue-600', 'text-white');
+                    targetButton.classList.remove('bg-white', 'text-gray-800');
+                }
+            } 
+        };
+
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>
